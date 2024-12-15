@@ -1,6 +1,7 @@
 {
     "files.associations": {
-        "stm32f4xx_hal_gpio.h": "c",
-        "stm32f4xx_hal_spi.h": "c"
+        "chrono": "cpp",
+        "fonts.h": "c",
+        "cpu_utils.h": "c"
     }
 }
