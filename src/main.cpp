@@ -53,9 +53,8 @@ void test_gyro(int max_iterations)
             button.reset();
         }
 
-        gyro.read(gx, gy, gz);
-        printf("%02d: gx: %4.5f, gy: %4.5f, gz: %4.5f\n", i, gx, gy, gz);
-        thread_sleep_for(50);
+        gyro.read(gx, gy, gz, true);
+        printf("%03d: gx: %8.5f, gy: %8.5f, gz: %8.5f\n", i, gx, gy, gz);
     }
 
     lcd.Clear(LCD_COLOR_BLUE);
@@ -71,7 +70,7 @@ int main()
 
     init_lcd();
 
-    gyro.init(NO_AVERAGE, 20);
+    gyro.init(MOVING_AVERAGE, 20, false);
 
     // Calibrate the gyroscope
     lcd.Clear(LCD_COLOR_BLUE);
@@ -80,7 +79,7 @@ int main()
     lcd.Clear(LCD_COLOR_WHITE);
 
     // Test the gyroscope
-    test_gyro(200);
+    test_gyro(400);
 
     return 0;
 }

@@ -27,7 +27,7 @@
 #define DATA_READY_FLAG 2
 
 // Scaling Factor for data conversion dps --> rps (make sure its the right vale?!)
-#define SCALING_FACTOR (17.5f * 0.0175f / 1000.0f)
+#define SCALING_FACTOR 17.5f * 0.0175f / 1000.0f
 
 // Window Size for Moving Average Window
 #define DEFAULT_WINDOW_SIZE 10
@@ -70,10 +70,13 @@ public:
 
     /**
      * @brief Initializes the GYRO sensor.
-     * @param average_type - The type of average to use. Defaults to MOVING_AVERAGE.
+     * @param average_type - The type of average to use. Defaults to NO_AVERAGE.
+     * @param window_size - The size of the window for moving average. Defaults to DEFAULT_WINDOW_SIZE.
+     * @param timeout - The timeout for the data ready flag. Defaults to 50 ms.
+     * @param debug - Whether to enable debug mode. Defaults to false.
      * @return None
      */
-    void init(AverageType average_type = MOVING_AVERAGE, int window_size = DEFAULT_WINDOW_SIZE);
+    void init(AverageType average_type = NO_AVERAGE, int window_size = DEFAULT_WINDOW_SIZE, int timeout = 50, bool debug = false);
 
     /**
      * @brief Calibrates the GYRO sensor.
@@ -95,28 +98,31 @@ public:
 private:
     SPI spi;
     AverageType average_type;
-    // float gx, gy, gz;
+
+    Timer timer;
+    int timeout;
 
     EventFlags flags;
     uint8_t write_buf[32], read_buf[32];
 
-    uint16_t raw_gx, raw_gy, raw_gz;
-    float gx_offset = 0.0f, gy_offset = 0.0f, gz_offset = 0.0f;
-    float window_gx[DEFAULT_WINDOW_SIZE], window_gy[DEFAULT_WINDOW_SIZE], window_gz[DEFAULT_WINDOW_SIZE];
-    int window_index;
+    int16_t raw_gx, raw_gy, raw_gz;
+    float gx_offset = 0, gy_offset = 0, gz_offset = 0;
+    float *window_gx, *window_gy, *window_gz;
     int window_size;
+    int window_index = 0;
+    float cache_sum_gx = 0.0f, cache_sum_gy = 0.0f, cache_sum_gz = 0.0f;
+
+    bool debug = false;
 
     void spi_callback(int event);
     void data_callback();
 
     /**
      * @brief Reads the original GYRO sensor data.
-     * @param gx - The raw X axis data.
-     * @param gy - The raw Y axis data.
-     * @param gz - The raw Z axis data.
+     * @param None
      * @return None
      */
-    void read_original(float &gx, float &gy, float &gz);
+    void read_raw();
 };
 
 #else
