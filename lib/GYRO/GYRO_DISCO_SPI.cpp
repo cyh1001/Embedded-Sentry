@@ -43,7 +43,7 @@ void GYRO_DISCO_SPI::init(AverageType average_type, int window_size)
     write_buf[1] = 0xFF;
 }
 
-void GYRO_DISCO_SPI::read(float &gx, float &gy, float &gz)
+void GYRO_DISCO_SPI::read_original(float &gx, float &gy, float &gz)
 {
     // Wait for data ready flag (timeout 255 ms --> 0xFF)
     flags.wait_all(DATA_READY_FLAG, 0xFF, true);
@@ -62,6 +62,18 @@ void GYRO_DISCO_SPI::read(float &gx, float &gy, float &gz)
     gx = raw_gx * SCALING_FACTOR;
     gy = raw_gy * SCALING_FACTOR;
     gz = raw_gz * SCALING_FACTOR;
+}
+
+void GYRO_DISCO_SPI::read(float &gx, float &gy, float &gz, bool calibrate)
+{
+    read_original(gx, gy, gz);
+
+    if (calibrate)
+    {
+        gx -= gx_offset;
+        gy -= gy_offset;
+        gz -= gz_offset;
+    }
 
     // Moving Average FIR
     if (average_type == MOVING_AVERAGE)
@@ -81,6 +93,25 @@ void GYRO_DISCO_SPI::read(float &gx, float &gy, float &gz)
         gz = sum_gz / window_size;
         window_index = (window_index + 1) % window_size;
     }
+}
+
+void GYRO_DISCO_SPI::calibrate(int samples)
+{
+    float gx, gy, gz;
+    float sum_gx = 0.0f, sum_gy = 0.0f, sum_gz = 0.0f;
+    for (int i = 0; i < samples; i++)
+    {
+        read_original(gx, gy, gz);
+        sum_gx += gx;
+        sum_gy += gy;
+        sum_gz += gz;
+    }
+    gx_offset = sum_gx / samples;
+    gy_offset = sum_gy / samples;
+    gz_offset = sum_gz / samples;
+
+    printf("========== Calibration complete! ==========\n");
+    printf("X Offset: %f, Y Offset: %f, Z Offset: %f\n", gx_offset, gy_offset, gz_offset);
 }
 
 // Callback function for SPI Transfer Completion

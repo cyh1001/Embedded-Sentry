@@ -27,10 +27,13 @@
 #define DATA_READY_FLAG 2
 
 // Scaling Factor for data conversion dps --> rps (make sure its the right vale?!)
-#define SCALING_FACTOR (17.5f * 0.0174532925199432957692236907684886f / 1000.0f)
+#define SCALING_FACTOR (17.5f * 0.0175f / 1000.0f)
 
 // Window Size for Moving Average Window
 #define DEFAULT_WINDOW_SIZE 10
+
+// Calibration Samples
+#define CALIBRATION_SAMPLES 100
 
 enum AverageType
 {
@@ -73,11 +76,21 @@ public:
     void init(AverageType average_type = MOVING_AVERAGE, int window_size = DEFAULT_WINDOW_SIZE);
 
     /**
-     * @brief Reads the GYRO sensor.
-     * @param None
+     * @brief Calibrates the GYRO sensor.
+     * @param samples - The number of samples to take for calibration. Defaults to 100.
      * @return None
      */
-    void read(float &gx, float &gy, float &gz);
+    void calibrate(int samples = CALIBRATION_SAMPLES);
+
+    /**
+     * @brief Reads the GYRO sensor.
+     * @param gx - The X axis data.
+     * @param gy - The Y axis data.
+     * @param gz - The Z axis data.
+     * @param calibrate - Whether to use the calibration offsets. Defaults to true.
+     * @return None
+     */
+    void read(float &gx, float &gy, float &gz, bool calibrate = true);
 
 private:
     SPI spi;
@@ -88,12 +101,22 @@ private:
     uint8_t write_buf[32], read_buf[32];
 
     uint16_t raw_gx, raw_gy, raw_gz;
+    float gx_offset = 0.0f, gy_offset = 0.0f, gz_offset = 0.0f;
     float window_gx[DEFAULT_WINDOW_SIZE], window_gy[DEFAULT_WINDOW_SIZE], window_gz[DEFAULT_WINDOW_SIZE];
     int window_index;
     int window_size;
 
     void spi_callback(int event);
     void data_callback();
+
+    /**
+     * @brief Reads the original GYRO sensor data.
+     * @param gx - The raw X axis data.
+     * @param gy - The raw Y axis data.
+     * @param gz - The raw Z axis data.
+     * @return None
+     */
+    void read_original(float &gx, float &gy, float &gz);
 };
 
 #else

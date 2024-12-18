@@ -71,9 +71,16 @@ int main()
 
     init_lcd();
 
-    gyro.init(MOVING_AVERAGE, 20);
+    gyro.init(NO_AVERAGE, 20);
 
-    test_gyro(50);
+    // Calibrate the gyroscope
+    lcd.Clear(LCD_COLOR_BLUE);
+    lcd.DisplayStringAt(0, LINE(5), (uint8_t *)"Calibrating...", CENTER_MODE);
+    gyro.calibrate(100);
+    lcd.Clear(LCD_COLOR_WHITE);
+
+    // Test the gyroscope
+    test_gyro(200);
 
     return 0;
 }
