@@ -34,15 +34,21 @@ bool match_gesture()
     {
         printf("========== Total difference: %f ==========\n", total_diff);
     }
+    double energy = fabs(total_diff);
     return total_diff < MATCH_THRESHOLD;
 }
 
 void record_gesture(GYRO_DISCO_SPI &gyro, bool is_key_sequence)
 {
     float(*seq)[3] = is_key_sequence ? key_sequence : trial_sequence;
+    GYRO_DISCO_SPI::GyroData data;
     for (int i = 0; i < MATCH_WINDOW_SIZE; i++)
     {
-        gyro.read(seq[i][0], seq[i][1], seq[i][2]);
+        data = gyro.read();
+        for (int j = 0; j < 3; j++)
+        {
+            seq[i][j] = data.data[j];
+        }
     }
     if (DEBUG_ON)
     {

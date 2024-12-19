@@ -2,6 +2,7 @@
     "files.associations": {
         "chrono": "cpp",
         "fonts.h": "c",
-        "cpu_utils.h": "c"
+        "cpu_utils.h": "c",
+        "cmath": "cpp"
     }
 }

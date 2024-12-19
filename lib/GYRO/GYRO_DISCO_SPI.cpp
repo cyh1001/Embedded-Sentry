@@ -13,6 +13,13 @@ GYRO_DISCO_SPI::~GYRO_DISCO_SPI()
     delete[] window_gz;
 }
 
+void GYRO_DISCO_SPI::write_reg(uint8_t reg, uint8_t val) {
+    write_buf[0] = reg;
+    write_buf[1] = val;
+    spi.transfer(write_buf, 2, read_buf, 2, callback(this, &GYRO_DISCO_SPI::spi_callback));
+    flags.wait_all(SPI_FLAG);
+}
+
 void GYRO_DISCO_SPI::init(AverageType average_type, int window_size, bool debug)
 {
     this->debug = debug;
@@ -38,29 +45,12 @@ void GYRO_DISCO_SPI::init(AverageType average_type, int window_size, bool debug)
     spi.format(8, 0);
     spi.frequency(1000000);
 
-    // GYRO Configuration!
-    // 1. Control Register 1
-    write_buf[0] = CTRL_REG1;
-    write_buf[1] = CTRL_REG1_CONFIG;
-    spi.transfer(write_buf, 2, read_buf, 2, callback(this, &GYRO_DISCO_SPI::spi_callback));
-    flags.wait_all(SPI_FLAG);
-
-    // 2. Control Register 4
-    write_buf[0] = CTRL_REG4;
-    write_buf[1] = CTRL_REG4_CONFIG;
-    spi.transfer(write_buf, 2, read_buf, 2, callback(this, &GYRO_DISCO_SPI::spi_callback));
-    flags.wait_all(SPI_FLAG);
-
-    // 3. Control Register 3
-    write_buf[0] = CTRL_REG3;
-    write_buf[1] = CTRL_REG3_CONFIG;
-    spi.transfer(write_buf, 2, read_buf, 2, callback(this, &GYRO_DISCO_SPI::spi_callback));
-    flags.wait_all(SPI_FLAG);
-
-    // dUMMY BYTE for write_buf[1] --> Placeholder Value!
-    // We have to send an address and a value for write operation!
-    // We have the address but have to send a placeholder value as well!
-    write_buf[1] = 0xFF;
+    // Configuration
+    write_reg(CTRL_REG1, CTRL_REG1_CONFIG);
+    write_reg(CTRL_REG2, CTRL_REG2_CONFIG);
+    // write_reg(CTRL_REG3, CTRL_REG3_CONFIG);
+    write_reg(CTRL_REG4, CTRL_REG4_CONFIG);
+    write_reg(CTRL_REG5, CTRL_REG5_CONFIG);
 
     timer.start();
 }
@@ -81,7 +71,7 @@ void GYRO_DISCO_SPI::read_raw()
     raw_gz = (((uint16_t)read_buf[6]) << 8) | ((uint16_t)read_buf[5]);
 }
 
-void GYRO_DISCO_SPI::read(float &gx, float &gy, float &gz, bool calibrate)
+GYRO_DISCO_SPI::GyroData GYRO_DISCO_SPI::read(bool calibrate)
 {
     while (std::chrono::duration_cast<std::chrono::milliseconds>(timer.elapsed_time()).count() < timeout)
     {
@@ -92,41 +82,43 @@ void GYRO_DISCO_SPI::read(float &gx, float &gy, float &gz, bool calibrate)
     read_raw();
     timer.reset();
 
+    GyroData data;
+    data.raw[0] = raw_gx;
+    data.raw[1] = raw_gy;
+    data.raw[2] = raw_gz;
+
     // Convert raw data to radians per second!
-    gx = ((float)raw_gx) * SCALING_FACTOR;
-    gy = ((float)raw_gy) * SCALING_FACTOR;
-    gz = ((float)raw_gz) * SCALING_FACTOR;
+    data.data[0] = ((float)raw_gx) * SCALING_FACTOR;
+    data.data[1] = ((float)raw_gy) * SCALING_FACTOR;
+    data.data[2] = ((float)raw_gz) * SCALING_FACTOR;
 
     if (calibrate)
     {
-        gx -= gx_offset;
-        gy -= gy_offset;
-        gz -= gz_offset;
+        data.data[0] -= gx_offset;
+        data.data[1] -= gy_offset;
+        data.data[2] -= gz_offset;
     }
 
     if (debug)
-        printf("gx = %8.5f, gy = %8.5f, gz = %8.5f\n", gx, gy, gz);
+        printf("gx = %8.5f, gy = %8.5f, gz = %8.5f\n", data.data[0], data.data[1], data.data[2]);
 
     // Moving Average FIR
     if (average_type == MOVING_AVERAGE)
     {
-        if (debug)
-        {
-            printf("gx = %8.5f, window_gx[%zu] = %8.5f\n", gx, window_index, window_gx[window_index]);
-            printf("gx_delta = %8.5f, gy_delta = %8.5f, gz_delta = %8.5f\n", gx - window_gx[window_index], gy - window_gy[window_index], gz - window_gz[window_index]);
-        }
-        cache_sum_gx += (gx - window_gx[window_index]);
-        cache_sum_gy += (gy - window_gy[window_index]);
-        cache_sum_gz += (gz - window_gz[window_index]);
-        window_gx[window_index] = gx;
-        window_gy[window_index] = gy;
-        window_gz[window_index] = gz;
+        cache_sum_gx += (data.data[0] - window_gx[window_index]);
+        cache_sum_gy += (data.data[1] - window_gy[window_index]);
+        cache_sum_gz += (data.data[2] - window_gz[window_index]);
+        window_gx[window_index] = data.data[0];
+        window_gy[window_index] = data.data[1];
+        window_gz[window_index] = data.data[2];
 
-        gx = cache_sum_gx / window_size;
-        gy = cache_sum_gy / window_size;
-        gz = cache_sum_gz / window_size;
+        data.data[0] = cache_sum_gx / window_size;
+        data.data[1] = cache_sum_gy / window_size;
+        data.data[2] = cache_sum_gz / window_size;
         window_index = (window_index + 1) % window_size;
     }
+
+    return data;
 }
 
 void GYRO_DISCO_SPI::calibrate(int samples)
@@ -134,17 +126,16 @@ void GYRO_DISCO_SPI::calibrate(int samples)
     printf("========== Calibrating ==========\n");
     printf("Please keep the sensor still for %d samples...\n", samples);
 
-    float gx, gy, gz;
     float sum_gx = 0, sum_gy = 0, sum_gz = 0;
 
     for (int i = 0; i < samples; i++)
     {
-        read(gx, gy, gz, false);
+        GyroData data = read(false);
         if (debug)
-            printf("Sample %d: gx: %f, gy: %f, gz: %f\n", i, gx, gy, gz);
-        sum_gx += gx;
-        sum_gy += gy;
-        sum_gz += gz;
+            printf("Sample %d: gx: %f, gy: %f, gz: %f\n", i, data.data[0], data.data[1], data.data[2]);
+        sum_gx += data.data[0];
+        sum_gy += data.data[1];
+        sum_gz += data.data[2];
     }
     gx_offset = sum_gx / samples;
     gy_offset = sum_gy / samples;

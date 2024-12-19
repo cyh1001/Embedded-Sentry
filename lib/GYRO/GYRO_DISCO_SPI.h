@@ -9,15 +9,23 @@
 
 // Control Register 1
 #define CTRL_REG1 0x20
-#define CTRL_REG1_CONFIG 0b01'10'1'1'1'1
+#define CTRL_REG1_CONFIG 0b0100'1111
 
-// Control Register 4
-#define CTRL_REG4 0x23
-#define CTRL_REG4_CONFIG 0b0'0'01'0'00'0
+// Control Register 2
+#define CTRL_REG2 0x21
+#define CTRL_REG2_CONFIG 0b0000'0101
 
 // Control Register 3
 #define CTRL_REG3 0x22
-#define CTRL_REG3_CONFIG 0b0'0'0'0'1'000
+#define CTRL_REG3_CONFIG 0b0000'1000
+
+// Control Register 4
+#define CTRL_REG4 0x23
+#define CTRL_REG4_CONFIG 0b0000'0000
+
+// Control Register 5
+#define CTRL_REG5 0x24
+#define CTRL_REG5_CONFIG 0b00010000
 
 // Output Register --> X axis
 #define OUT_X_L 0x28
@@ -33,7 +41,7 @@
 #define DEFAULT_WINDOW_SIZE 10
 
 // Data sampling
-#define SAMPLE_RATE 20 // Hz
+#define SAMPLE_RATE 40                    // Hz
 #define SAMPLE_TIMEOUT 1000 / SAMPLE_RATE // ms
 
 // Calibration Samples
@@ -72,6 +80,12 @@ public:
     GYRO_DISCO_SPI();
     ~GYRO_DISCO_SPI();
 
+    struct GyroData
+    {
+        float data[3];  // degrees per second
+        int16_t raw[3]; // raw sensor values
+    };
+
     /**
      * @brief Initializes the GYRO sensor.
      * @param average_type - The type of average to use. Defaults to NO_AVERAGE.
@@ -94,9 +108,9 @@ public:
      * @param gy - The Y axis data.
      * @param gz - The Z axis data.
      * @param calibrate - Whether to use the calibration offsets. Defaults to true.
-     * @return None
+     * @return GyroData - The gyro data.
      */
-    void read(float &gx, float &gy, float &gz, bool calibrate = true);
+    GyroData read(bool calibrate = true);
 
 private:
     SPI spi;
@@ -119,6 +133,8 @@ private:
 
     void spi_callback(int event);
     void data_callback();
+
+    void write_reg(uint8_t reg, uint8_t val);
 
     /**
      * @brief Reads the original GYRO sensor data.
