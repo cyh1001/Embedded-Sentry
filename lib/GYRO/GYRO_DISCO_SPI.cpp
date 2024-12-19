@@ -13,13 +13,13 @@ GYRO_DISCO_SPI::~GYRO_DISCO_SPI()
     delete[] window_gz;
 }
 
-void GYRO_DISCO_SPI::init(AverageType average_type, int window_size, int timeout, bool debug)
+void GYRO_DISCO_SPI::init(AverageType average_type, int window_size, bool debug)
 {
     this->debug = debug;
 
     this->average_type = average_type;
     this->window_size = window_size;
-    this->timeout = timeout;
+    this->timeout = SAMPLE_TIMEOUT;
 
     if (average_type == MOVING_AVERAGE)
     {

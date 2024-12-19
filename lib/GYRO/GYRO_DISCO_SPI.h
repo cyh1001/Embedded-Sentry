@@ -32,6 +32,10 @@
 // Window Size for Moving Average Window
 #define DEFAULT_WINDOW_SIZE 10
 
+// Data sampling
+#define SAMPLE_RATE 20 // Hz
+#define SAMPLE_TIMEOUT 1000 / SAMPLE_RATE // ms
+
 // Calibration Samples
 #define CALIBRATION_SAMPLES 100
 
@@ -72,11 +76,10 @@ public:
      * @brief Initializes the GYRO sensor.
      * @param average_type - The type of average to use. Defaults to NO_AVERAGE.
      * @param window_size - The size of the window for moving average. Defaults to DEFAULT_WINDOW_SIZE.
-     * @param timeout - The timeout for the data ready flag. Defaults to 50 ms.
      * @param debug - Whether to enable debug mode. Defaults to false.
      * @return None
      */
-    void init(AverageType average_type = NO_AVERAGE, int window_size = DEFAULT_WINDOW_SIZE, int timeout = 50, bool debug = false);
+    void init(AverageType average_type = NO_AVERAGE, int window_size = DEFAULT_WINDOW_SIZE, bool debug = false);
 
     /**
      * @brief Calibrates the GYRO sensor.
