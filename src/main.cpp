@@ -12,6 +12,9 @@
 #include "LCD_DISCO_F429ZI.h"
 #include "GYRO_DISCO_SPI.h"
 
+#include "main.h"
+#include "gesture.h"
+
 // --- LCD, Touchscreen, and Gyroscope Initialization ---
 LCD_DISCO_F429ZI lcd;
 TS_DISCO_F429ZI ts;
@@ -168,13 +171,9 @@ double compare_patterns() {
     double normalized_sign = (3.0 - sign_diff) / 3.0;
 
     // Weighted combination
-    const double w_mse = 0.6;
-    const double w_energy = 0.3;
-    const double w_sign = 0.1;
-
-    double similarity = (w_mse * normalized_mse) +
-                       (w_energy * normalized_energy) +
-                       (w_sign * normalized_sign);
+    double similarity = (MSE_WEIGHT * normalized_mse) +
+                        (ENERGY_WEIGHT * normalized_energy) +
+                        (SIGN_WEIGHT * normalized_sign);
 
     printf("MSE: %.6f, Energy diff: %.6f, Sign diff: %d\n", mse, energy_diff, sign_diff);
     printf("Final similarity: %.6f\n", similarity);
@@ -255,7 +254,7 @@ int main() {
     // SPI spi(PF_9, PF_8, PF_7, PC_1, use_gpio_ssel);
     // ImuSensor imu(spi);
 
-    gyro.init(MOVING_AVERAGE, 5);
+    gyro.init(MOVING_AVERAGE, 10);
 
     // if(!imu.setup()) {
     //     printf("IMU initialization failed\n");
@@ -296,7 +295,7 @@ int main() {
                 } else {
                     double similarity = compare_patterns();
                     printf("Similarity: %.3f\n", similarity);
-                    show_result(similarity > 0.80);  // Threshold from reference implementation
+                    show_result(similarity > MATCH_THRESHOLD); // Threshold from reference implementation
                 }
                 is_capturing = false;
                 is_matching = false;

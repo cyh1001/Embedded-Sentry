@@ -5,7 +5,11 @@
 
 #ifdef TARGET_DISCO_F429ZI
 
-#define MATCH_THRESHOLD 1.0f
+#define MATCH_THRESHOLD 0.65f
+
+#define MSE_WEIGHT 1.0f
+#define ENERGY_WEIGHT 0.f
+#define SIGN_WEIGHT 1.0f - MSE_WEIGHT - ENERGY_WEIGHT
 
 // Time window for matching the gesture in seconds
 #define MATCH_SEQ_LENGTH 2

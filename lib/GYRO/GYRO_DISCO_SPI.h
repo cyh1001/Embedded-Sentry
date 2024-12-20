@@ -25,7 +25,7 @@
 
 // Control Register 5
 #define CTRL_REG5 0x24
-#define CTRL_REG5_CONFIG 0b00010000
+#define CTRL_REG5_CONFIG 0b0001'0000
 
 // Output Register --> X axis
 #define OUT_X_L 0x28
