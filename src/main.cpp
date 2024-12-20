@@ -8,294 +8,61 @@
 //  */
 
 #include "mbed.h"
-#include "TS_DISCO_F429ZI.h"
-#include "LCD_DISCO_F429ZI.h"
 #include "GYRO_DISCO_SPI.h"
 
 #include "main.h"
+#include "screen.h"
 #include "gesture.h"
 
-// --- LCD, Touchscreen, and Gyroscope Initialization ---
-LCD_DISCO_F429ZI lcd;
-TS_DISCO_F429ZI ts;
+// Gyroscope Declaration
 GYRO_DISCO_SPI gyro;
 
-// Debug LED
-DigitalOut led1(LED1);
+// Arrays to store movement sequences
+double key_pattern[MATCH_SEQ_LENGTH][3] = {0};   // Array to store key gesture
+double trial_pattern[MATCH_SEQ_LENGTH][3] = {0}; // Array to store trial gesture
 
-// ----- Arrays to store movement sequences -----
-constexpr int MAX_SAMPLES = 30;  // Reduced to match reference implementation
-constexpr int SAMPLE_INTERVAL_MS = 25;  // Match reference implementation timing
-
-double stored_pattern[MAX_SAMPLES][3] = {0};  // Array to store reference gesture
-double current_pattern[MAX_SAMPLES][3] = {0}; // Array to store current gesture
-
-// ----- State variables -----
+// State variables
 bool is_capturing = false;
 bool is_matching = false;
 uint8_t sample_count = 0;
 bool pattern_stored = false;
 
-// ----- Function Prototypes -----
-void init_display();
-void draw_ui();
-void show_data(const GYRO_DISCO_SPI::GyroData &motion);
-void process_touch();
-void show_count(uint8_t count);
-void update_status(const char* status);
-void show_result(bool success);
-double compare_patterns();
-uint16_t map_touch_x(uint16_t x);
-uint16_t map_touch_y(uint16_t y);
-
-// ----- Function Implementations -----
-void init_display() {
-    lcd.Clear(LCD_COLOR_BLACK);
-    lcd.SetBackColor(LCD_COLOR_BLACK);
-    lcd.SetTextColor(LCD_COLOR_WHITE);
-    lcd.SetFont(&Font16);
-}
-
-// 触摸屏坐标映射
-uint16_t map_touch_x(uint16_t x) {
-    return (x * lcd.GetXSize()) / 240;
-}
-
-uint16_t map_touch_y(uint16_t y) {
-    return (y * lcd.GetYSize()) / 320;
-}
-
-void show_data(const GYRO_DISCO_SPI::GyroData &motion)
+int main()
 {
-    char buf[6][32];
-
-    // Convert values to strings with fixed precision
-    for(int i = 0; i < 3; i++) {
-        int whole = (int)motion.data[i];
-        int frac = (int)abs((motion.data[i] - whole) * 100);
-        snprintf(buf[i], sizeof(buf[i]), "%d.%02d", whole, frac);
-        snprintf(buf[i + 3], sizeof(buf[i + 3]), "%d", motion.raw[i]);
-    }
-
-    // Clear previous values
-    lcd.SetBackColor(LCD_COLOR_BLACK);
-    lcd.SetTextColor(LCD_COLOR_BLACK);
-    lcd.FillRect(40, 10, 190, 100);
-
-    lcd.SetTextColor(LCD_COLOR_WHITE);
-
-    // Display readings
-    const char* labels[] = {"X:", "Y:", "Z:"};
-    for(int i = 0; i < 3; i++) {
-        lcd.DisplayStringAt(10, 20+i*30, (uint8_t*)labels[i], LEFT_MODE);
-        lcd.DisplayStringAt(40, 20+i*30, (uint8_t*)buf[i], LEFT_MODE);
-        lcd.DisplayStringAt(130, 20+i*30, (uint8_t*)buf[i+3], LEFT_MODE);
-    }
-}
-
-void draw_ui() {
-    lcd.Clear(LCD_COLOR_BLACK);
-
-    // Data display area
-    lcd.SetTextColor(LCD_COLOR_WHITE);
-    lcd.DrawRect(5, 5, 230, 130);
-
-    // Control buttons
-    lcd.SetTextColor(LCD_COLOR_GREEN);
-    lcd.FillRect(20, 140, 90, 60);
-    lcd.SetTextColor(LCD_COLOR_BLUE);
-    lcd.FillRect(130, 140, 90, 60);
-
-    lcd.SetBackColor(LCD_COLOR_GREEN);
-    lcd.SetTextColor(LCD_COLOR_BLACK);
-    lcd.DisplayStringAt(35, 160, (uint8_t*)"RECORD", LEFT_MODE);
-
-    lcd.SetBackColor(LCD_COLOR_BLUE);
-    lcd.DisplayStringAt(145, 160, (uint8_t*)"VERIFY", LEFT_MODE);
-
-    lcd.SetBackColor(LCD_COLOR_BLACK);
-}
-
-void show_count(uint8_t count) {
-    lcd.SetBackColor(LCD_COLOR_BLACK);
-    lcd.SetTextColor(LCD_COLOR_WHITE);
-    char countStr[10];
-    sprintf(countStr, "%d", count);
-    lcd.SetFont(&Font20);
-    lcd.DisplayStringAt(0, 210, (uint8_t*)countStr, CENTER_MODE);
-    lcd.SetFont(&Font16);
-}
-
-void update_status(const char* status) {
-    lcd.SetBackColor(LCD_COLOR_BLACK);
-    lcd.SetTextColor(LCD_COLOR_WHITE);
-    lcd.DisplayStringAt(0, 240, (uint8_t*)status, CENTER_MODE);
-}
-
-double compare_patterns() {
-    double mse = 0.0;
-    double energy1 = 0.0, energy2 = 0.0;
-    double sum_stored[3] = {0.0}, sum_current[3] = {0.0};
-
-    // Calculate MSE, energy and direction sums
-    for(int i = 0; i < MAX_SAMPLES; i++) {
-        for(int j = 0; j < 3; j++) {
-            // MSE
-            double diff = stored_pattern[i][j] - current_pattern[i][j];
-            mse += diff * diff;
-
-            // Energy
-            energy1 += fabs(stored_pattern[i][j]);
-            energy2 += fabs(current_pattern[i][j]);
-
-            // Direction sums
-            sum_stored[j] += stored_pattern[i][j];
-            sum_current[j] += current_pattern[i][j];
-        }
-    }
-
-    mse /= (MAX_SAMPLES * 3);
-    double energy_diff = fabs(energy1 - energy2);
-
-    // Calculate direction differences
-    int sign_diff = 0;
-    for(int k = 0; k < 3; k++) {
-        if((sum_stored[k] >= 0) != (sum_current[k] >= 0)) {
-            sign_diff++;
-        }
-    }
-
-    // Normalize metrics
-    double normalized_mse = 1.0 / (1.0 + mse);
-    double normalized_energy = 1.0 / (1.0 + energy_diff);
-    double normalized_sign = (3.0 - sign_diff) / 3.0;
-
-    // Weighted combination
-    double similarity = (MSE_WEIGHT * normalized_mse) +
-                        (ENERGY_WEIGHT * normalized_energy) +
-                        (SIGN_WEIGHT * normalized_sign);
-
-    printf("MSE: %.6f, Energy diff: %.6f, Sign diff: %d\n", mse, energy_diff, sign_diff);
-    printf("Final similarity: %.6f\n", similarity);
-
-    return similarity;
-}
-
-void show_result(bool success) {
-    if (success) {
-        lcd.Clear(LCD_COLOR_GREEN);  // Green background for success
-        lcd.SetBackColor(LCD_COLOR_WHITE);
-        lcd.SetTextColor(LCD_COLOR_GREEN);
-        lcd.DisplayStringAt(0, 120, (uint8_t*)"SUCCESS!", CENTER_MODE);
-    } else {
-        lcd.Clear(LCD_COLOR_RED);  // Red background for failure
-        lcd.SetBackColor(LCD_COLOR_WHITE);
-        lcd.SetTextColor(LCD_COLOR_RED);
-        lcd.DisplayStringAt(0, 120, (uint8_t*)"FAILED!", CENTER_MODE);
-    }
-
-    // Wait for 2 seconds to allow the user to see the result
-    thread_sleep_for(2000);
-
-    // After the message is shown, reset the display and draw the main UI again
-    init_display();
-    draw_ui();
-}
-
-void process_touch() {
-    TS_StateTypeDef state;
-    ts.GetState(&state);
-
-    if(!state.TouchDetected) return;
-
-    uint16_t x = map_touch_x(state.X);
-    uint16_t y = map_touch_y(state.Y);
-
-    printf("Touch detected at X: %d, Y: %d (mapped)\n", x, y);
-    // Define the boundaries for the RECORD button
-    uint16_t x_min_record = 20;
-    uint16_t x_max_record = 110;
-    uint16_t y_min_record = 140;
-    uint16_t y_max_record = 200;
-
-    // Define the boundaries for the VERIFY button
-    uint16_t x_min_verify = 130;
-    uint16_t x_max_verify = 220;
-    uint16_t y_min_verify = 140;
-    uint16_t y_max_verify = 200;
-    // 将屏幕分为左右两部分，中间留出20像素的间隔
-    // 左半边 (0-110) = RECORD
-    if(x >= x_min_record && x <= x_max_record && y >= y_min_record && y <= y_max_record) {
-        led1 = !led1;
-        is_capturing = true;
-        sample_count = 0;
-        printf("Record button pressed\n");
-        update_status("Recording...");
-    }
-    // 右半边 (130-240) = VERIFY
-    else if(x >= x_min_verify && x <= x_max_verify && y >= y_min_verify && y <= y_max_verify) {
-        if(!pattern_stored) {
-            update_status("Record pattern first!");
-            thread_sleep_for(1500);
-            draw_ui();
-            return;
-        }
-        led1 = !led1;
-        is_matching = true;
-        sample_count = 0;
-        printf("Verify button pressed\n");
-        update_status("Verifying...");
-    }
-}
-
-int main() {
-    printf("Starting initialization...\n");
-
-    // SPI spi(PF_9, PF_8, PF_7, PC_1, use_gpio_ssel);
-    // ImuSensor imu(spi);
-
     gyro.init(MOVING_AVERAGE, 10);
 
-    // if(!imu.setup()) {
-    //     printf("IMU initialization failed\n");
-    //     return -1;
-    // }
-    printf("IMU initialized successfully\n");
-
-    ts.Init(lcd.GetXSize(), lcd.GetYSize());
-    init_display();
+    init_screen();
     draw_ui();
 
-    printf("Calibrating IMU...\n");
-    // imu.zero_calibration();
     gyro.calibrate(100);
-    printf("Calibration complete\n");
 
     while(true) {
         GYRO_DISCO_SPI::GyroData motion = gyro.read();
         show_data(motion);
-        process_touch();
+        process_touch(pattern_stored, is_capturing, is_matching, sample_count);
 
         if(is_capturing || is_matching) {
-            if(sample_count < MAX_SAMPLES) {
-                double* pattern = is_capturing ? stored_pattern[sample_count] : current_pattern[sample_count];
-                pattern[0] = motion.data[0];
-                pattern[1] = motion.data[1];
-                pattern[2] = motion.data[2];
+            if (sample_count < MATCH_SEQ_LENGTH)
+            {
+                double *pattern = is_capturing ? key_pattern[sample_count] : trial_pattern[sample_count];
+                for (int i = 0; i < 3; i++)
+                {
+                    pattern[i] = motion.data[i];
+                }
 
                 printf("Sample %d: %f, %f, %f\n", sample_count, pattern[0], pattern[1], pattern[2]);
 
                 show_count(sample_count);
                 sample_count++;
-                // thread_sleep_for(SAMPLE_INTERVAL_MS);
-            } else {
+            }
+            else
+            {
                 if(is_capturing) {
                     pattern_stored = true;
                     update_status("Pattern recorded!");
                 } else {
-                    double similarity = compare_patterns();
-                    printf("Similarity: %.3f\n", similarity);
-                    show_result(similarity > MATCH_THRESHOLD); // Threshold from reference implementation
+                    bool matched = match_gesture(key_pattern, trial_pattern);
+                    show_result(matched);
                 }
                 is_capturing = false;
                 is_matching = false;

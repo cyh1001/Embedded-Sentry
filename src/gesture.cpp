@@ -3,64 +3,26 @@
 
 #include "main.h"
 
-static float (*key_sequence)[3] = new float[MATCH_WINDOW_SIZE][3];
-static float (*trial_sequence)[3] = new float[MATCH_WINDOW_SIZE][3];
-
-void reset_gesture()
+bool match_gesture(double key_pattern[MATCH_SEQ_LENGTH][3], double trial_pattern[MATCH_SEQ_LENGTH][3])
 {
-    for (int i = 0; i < MATCH_WINDOW_SIZE; i++)
-    {
-        for (int j = 0; j < 3; j++)
-        {
-            key_sequence[i][j] = 0.0f;
-            trial_sequence[i][j] = 0.0f;
-        }
-    }
-}
+    double mse = 0.0;
 
-bool match_gesture()
-{
-    float total_diff = 0.0f;
-    for (int i = 0; i < MATCH_WINDOW_SIZE; i++)
+    // Calculate MSE
+    for (int i = 0; i < MATCH_SEQ_LENGTH; i++)
     {
         for (int j = 0; j < 3; j++)
         {
-            float diff = key_sequence[i][j] - trial_sequence[i][j];
-            total_diff += diff * diff;
+            // MSE
+            double diff = key_pattern[i][j] - trial_pattern[i][j];
+            mse += diff * diff;
         }
     }
-    total_diff /= MATCH_WINDOW_SIZE;
-    if (DEBUG_ON)
-    {
-        printf("========== Total difference: %f ==========\n", total_diff);
-    }
-    double energy = fabs(total_diff);
-    return total_diff < MATCH_THRESHOLD;
-}
 
-void record_gesture(GYRO_DISCO_SPI &gyro, bool is_key_sequence)
-{
-    float(*seq)[3] = is_key_sequence ? key_sequence : trial_sequence;
-    GYRO_DISCO_SPI::GyroData data;
-    for (int i = 0; i < MATCH_WINDOW_SIZE; i++)
-    {
-        data = gyro.read();
-        for (int j = 0; j < 3; j++)
-        {
-            seq[i][j] = data.data[j];
-        }
-    }
-    if (DEBUG_ON)
-    {
-        printf("Recorded gesture: %s\n", is_key_sequence ? "key" : "trial");
-        for (int j = 0; j < 3; j++)
-        {
-            for (int i = 0; i < MATCH_WINDOW_SIZE; i++)
-            {
-                printf("%8.4f, ", seq[i][j]);
-            }
-            printf("\n");
-        }
-        printf("\n");
-    }
+    mse /= (MATCH_SEQ_LENGTH * 3);
+    printf("MSE: %.6f\n", mse);
+
+    double similarity = 1.0 / (1.0 + mse);
+    printf("Similarity: %.6f\n", similarity);
+
+    return similarity > MATCH_THRESHOLD;
 }

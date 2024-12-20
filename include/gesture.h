@@ -7,22 +7,12 @@
 
 #define MATCH_THRESHOLD 0.65f
 
-#define MSE_WEIGHT 1.0f
-#define ENERGY_WEIGHT 0.f
-#define SIGN_WEIGHT 1.0f - MSE_WEIGHT - ENERGY_WEIGHT
-
 // Time window for matching the gesture in seconds
-#define MATCH_SEQ_LENGTH 2
+#define MATCH_SEQ_LENGTH 30
 
 #include "GYRO_DISCO_SPI.h"
 
-#define MATCH_WINDOW_SIZE (MATCH_SEQ_LENGTH * SAMPLE_RATE)
-
-void reset_gesture();
-
-bool match_gesture();
-
-void record_gesture(GYRO_DISCO_SPI &gyro, bool is_key_sequence = false);
+bool match_gesture(double key_pattern[MATCH_SEQ_LENGTH][3], double trial_pattern[MATCH_SEQ_LENGTH][3]);
 
 #else
 #error "This class must be used with DISCO_F429ZI board only."
