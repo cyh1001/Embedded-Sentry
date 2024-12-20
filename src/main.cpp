@@ -184,27 +184,21 @@ double compare_patterns() {
 
 void show_result(bool success) {
     if (success) {
-        for (int i = 0; i < 25; i++) {
-            lcd.Clear(LCD_COLOR_GREEN);
-            lcd.SetBackColor(LCD_COLOR_GREEN);
-            lcd.SetTextColor(LCD_COLOR_WHITE);
-            lcd.DisplayStringAt(0, 120, (uint8_t*)"SUCCESS!", CENTER_MODE);
-            thread_sleep_for(80);
-
-            lcd.Clear(LCD_COLOR_BLACK);
-            lcd.SetBackColor(LCD_COLOR_BLACK);
-            lcd.SetTextColor(LCD_COLOR_WHITE);
-            lcd.DisplayStringAt(0, 120, (uint8_t*)"SUCCESS!", CENTER_MODE);
-            thread_sleep_for(100);
-        }
+        lcd.Clear(LCD_COLOR_GREEN);  // Green background for success
+        lcd.SetBackColor(LCD_COLOR_WHITE);
+        lcd.SetTextColor(LCD_COLOR_GREEN);
+        lcd.DisplayStringAt(0, 120, (uint8_t*)"SUCCESS!", CENTER_MODE);
     } else {
-        lcd.Clear(LCD_COLOR_RED);
-        lcd.SetBackColor(LCD_COLOR_RED);
-        lcd.SetTextColor(LCD_COLOR_WHITE);
+        lcd.Clear(LCD_COLOR_RED);  // Red background for failure
+        lcd.SetBackColor(LCD_COLOR_WHITE);
+        lcd.SetTextColor(LCD_COLOR_RED);
         lcd.DisplayStringAt(0, 120, (uint8_t*)"FAILED!", CENTER_MODE);
-        thread_sleep_for(1500);
     }
 
+    // Wait for 2 seconds to allow the user to see the result
+    thread_sleep_for(2000);
+
+    // After the message is shown, reset the display and draw the main UI again
     init_display();
     draw_ui();
 }
@@ -219,10 +213,20 @@ void process_touch() {
     uint16_t y = map_touch_y(state.Y);
 
     printf("Touch detected at X: %d, Y: %d (mapped)\n", x, y);
+    // Define the boundaries for the RECORD button
+    uint16_t x_min_record = 20;
+    uint16_t x_max_record = 110;
+    uint16_t y_min_record = 140;
+    uint16_t y_max_record = 200;
 
+    // Define the boundaries for the VERIFY button
+    uint16_t x_min_verify = 130;
+    uint16_t x_max_verify = 220;
+    uint16_t y_min_verify = 140;
+    uint16_t y_max_verify = 200;
     // 将屏幕分为左右两部分，中间留出20像素的间隔
     // 左半边 (0-110) = RECORD
-    if(x < 110) {
+    if(x >= x_min_record && x <= x_max_record && y >= y_min_record && y <= y_max_record) {
         led1 = !led1;
         is_capturing = true;
         sample_count = 0;
@@ -230,7 +234,7 @@ void process_touch() {
         update_status("Recording...");
     }
     // 右半边 (130-240) = VERIFY
-    else if(x > 130) {
+    else if(x >= x_min_verify && x <= x_max_verify && y >= y_min_verify && y <= y_max_verify) {
         if(!pattern_stored) {
             update_status("Record pattern first!");
             thread_sleep_for(1500);
