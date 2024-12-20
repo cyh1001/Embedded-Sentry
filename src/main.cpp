@@ -2,6 +2,10 @@
 //  * Project: STM32F429-Gesture-Lock-NYU-RTES
 //  * Course: ECE-GY 6483 Real Time Embedded Systems
 //  * School: NYU Tandon School of Engineering
+//  * Team Members:
+//  * 1. Yihan Cao (yc7683)
+//  * 2. Xianda Wu (xw3444)
+//  * 3. Yihao (Ethan) Wang (yw7486)
 //  *
 //  * A gesture-based authentication system using STM32F429I-DISC1's I3G4250D gyroscope.
 //  * Part of the Embedded Sentry security system project.
